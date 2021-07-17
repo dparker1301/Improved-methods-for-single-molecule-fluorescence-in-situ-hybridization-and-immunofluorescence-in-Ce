@@ -1,0 +1,100 @@
+---
+title: "Signal-to-noise Buffer Quantification"
+author: "Dylan Parker"
+date: "03/04/2021"
+output: html_document
+---
+
+## Load Packages
+
+dplyr  
+
+ggplot2
+
+ggthemes
+
+gridExtra
+
+tidyr
+
+```{r setup,  echo = FALSE, warning = FALSE, message = FALSE}
+print("script initiated on", quote = FALSE)
+Sys.time()
+#loading packages
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(gridExtra)
+library(tidyr)
+library(reshape2)
+```
+
+## Import
+
+Import the data.
+
+```{r, echo = FALSE}
+# import the data
+quantTable <- read.csv(file = "INPUT_FILE_HERE.csv", header = TRUE) 
+```
+
+## Exploratory Data Analysis
+
+Explore the data. Determine the dimensions & the data structure
+
+```{r pressure, echo=TRUE}
+dim(quantTable)
+head(quantTable)
+str(quantTable)
+
+colnames(quantTable)
+```
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+#Plot
+
+p <- ggplot(data = quantTable, aes(transcript, average_snr, color = buffer)) + 
+  scale_y_continuous(limits = c(0,20), expand = c(0,0)) +
+  geom_boxplot(outlier.shape = NA, position = position_dodge(0.85)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = (0.3), dodge.width = (0.85), seed = (1), jitter.height = (0)), alpha = (0.75)) +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(colour = "grey")) 
+  
+  
+p
+
+
+
+
+```
+
+## Statistics
+
+Test whether Stellaris buffers have significantly different signal-to-noise compared to homebrew buffers.
+
+```{r, echo = FALSE, warning = FALSE}
+
+transcript_SummaryTable <- quantTable%>%
+  dplyr::group_by(transcript, buffer) %>%
+  dplyr::summarize(value = list(average_snr)) %>%
+  spread(buffer, value)
+  
+# Perform t-tests
+transcript_pvalues <- data.frame()
+for (i in 1:4){
+transcript_pvalues[i,1] <- t.test(unlist(transcript_SummaryTable[[i,2]]), unlist(transcript_SummaryTable[[i,3]]))$p.value
+  rownames(transcript_pvalues)[i] <- as.character(transcript_SummaryTable$transcript[i])
+}
+colnames(transcript_pvalues)[1] <- c("p.value")
+  
+# Perform multiple test corrections using the Benjamini Hochberg method
+transcript_pvalues <- cbind(transcript_pvalues, BH_padjust = p.adjust(transcript_pvalues$p.value, method = "BH"))
+# Report p values
+
+```
+ 
+## Get versions
+```{r, echo = TRUE}
+sessionInfo()
+```
